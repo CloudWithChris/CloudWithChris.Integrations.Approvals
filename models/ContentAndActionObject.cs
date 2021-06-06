@@ -6,6 +6,7 @@ namespace CloudWithChris.Integrations.Approvals.Models
 {
     public class ContentAndActionObject
     {
+        public string code;
         [JsonProperty("id")]
         public string Id;
 

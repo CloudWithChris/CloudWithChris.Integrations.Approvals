@@ -9,19 +9,31 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Net.Http;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using System.Net;
 
 namespace CloudWithChris.Integrations.Approvals.Functions
 {
     public static class PostActionsToTopic
     {
         [FunctionName("HttpStart")]
-        // TODO: Change away from anonymous and fix local development scenario for POSTing
         public static async Task<HttpResponseMessage> HttpStart(
-            [HttpTrigger(AuthorizationLevel.Anonymous, methods: "post", Route = "actions")] HttpRequestMessage req,
+            [HttpTrigger(AuthorizationLevel.Function, methods: "post", Route = "actions")] HttpRequestMessage req,
             [DurableClient] IDurableClient starter,
             ILogger log)
         {
-            try 
+
+            if (req == null)
+            {
+                return req.CreateResponse(HttpStatusCode.NotFound);
+            }
+
+            var check = SecurityCheck(req);
+            if (check != null)
+            {
+                return check;
+            }
+
+            try
             {
                 // Function input comes from the request content.
                 object eventData = await req.Content.ReadAsAsync<object>();
@@ -29,11 +41,24 @@ namespace CloudWithChris.Integrations.Approvals.Functions
 
                 log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
 
-                return req.CreateResponse(System.Net.HttpStatusCode.Accepted, $"Started ActionOrchestrator {instanceId}");
+                return req.CreateResponse(System.Net.HttpStatusCode.OK, JsonConvert.SerializeObject($"Started orchestration with ID {instanceId}"), "text/json");
             } catch (Exception ex)
             {
                 return req.CreateResponse(System.Net.HttpStatusCode.InternalServerError, ex.Message);
             }
+        }
+
+
+        private static HttpResponseMessage SecurityCheck(HttpRequestMessage req)
+        {
+            return req.IsLocal() || req.RequestUri.Scheme == "https" ? null :
+                req.CreateResponse(HttpStatusCode.Forbidden);
+        }
+
+
+        public static bool IsLocal(this HttpRequestMessage request)
+        {
+            return request.RequestUri.IsLoopback;
         }
     }
 }

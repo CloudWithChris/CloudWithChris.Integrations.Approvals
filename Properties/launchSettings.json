@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CloudWithChris.Integrations.Approvals": {
+      "commandName": "Project",
+      "commandLineArgs": "host start --port 7073"
+    }
+  }
+}

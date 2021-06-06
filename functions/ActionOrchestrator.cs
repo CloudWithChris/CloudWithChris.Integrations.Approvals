@@ -5,6 +5,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using CloudWithChris.Integrations.Approvals.Models;
 using System.Collections.Generic;
+using CloudWithChris.Integrations.Approvals.models;
+using System.Linq;
+using System.Net.Http;
+using Newtonsoft.Json;
+using Microsoft.Azure.WebJobs.ServiceBus;
+using Microsoft.Azure.ServiceBus;
+using System.Text;
 
 namespace CloudWithChris.Integrations.Approvals.Functions
 {
@@ -18,7 +25,9 @@ namespace CloudWithChris.Integrations.Approvals.Functions
         {
             ContentAndActionObject contentAndActions  = context.GetInput<ContentAndActionObject>();
 
+            // Firstly, use the RetrieveShortUrl Activity function to obtain all of the needed URL Mappings
             List<Task> taskList = new List<Task>();
+            Task<List<URLMapping>> urlMappings = context.CallActivityAsync<List<URLMapping>>("RetrieveShortURL", contentAndActions);
             
             // Loop through each action that was added
             for (int actionPtr = 0; actionPtr < contentAndActions.Actions.Count; actionPtr++)
@@ -31,21 +40,31 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                     {
                         // Submit a newly shaped JSON Object to a SubOrchestrator.
                         // The Sub Orchestrator will perform a number of steps -
-                        // 1. Detect any cloudwithchris.com URLs and replace them
-                        //    with shortened URLs that navigate to UTM links
-                        //    to help with tracking marketing campaigns.
+                        // 1. If there is a match with a medium, then go ahead
+                        //    and replace the source appropriately.
                         // 2. Take the contents of above item, merge with the JSON
                         //    object and submit to the Topic.
+                        string _actionType = contentAndActions.Actions[actionPtr].ActionTypes[actionTypesPtr];
+                        string _platform = contentAndActions.Actions[actionPtr].Platforms[platformsPtr];
+                        string _source = contentAndActions.Source;
+
+                        URLMapping shortUrlMapping = (await urlMappings).Where(e => e.LongUrl.Contains($"utm_medium={_platform}")).FirstOrDefault();
+
+                        if (shortUrlMapping != null)
+                        {
+                            _source = shortUrlMapping.ShortUrl;
+                        }
 
                         TopicActionObject topicActionObject = new TopicActionObject()
                         {
                             Id = contentAndActions.Id,
                             Title = contentAndActions.Title,
                             ContentType = contentAndActions.ContentType,
-                            Source = contentAndActions.Source,
+                            Source = _source,
                             Summary = contentAndActions.Summary,
-                            ActionType = contentAndActions.Actions[actionPtr].ActionTypes[actionTypesPtr],
-                            Platform = contentAndActions.Actions[actionPtr].Platforms[platformsPtr]
+                            ActionType = _actionType,
+                            Platform = _platform,
+                            Message = contentAndActions.Actions[actionPtr].Message
                         };
 
                         taskList.Add(context.CallSubOrchestratorAsync("TopicActionTransformAndSend", topicActionObject));
@@ -58,7 +77,7 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             await Task.WhenAll(taskList);
         }
 
-        
+
         [FunctionName("TopicActionTransformAndSend")]
         public static async Task TopicActionTransformAndSendMethod
         (
@@ -68,56 +87,84 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             // Get the object that was passed in to the method
             TopicActionObject topicActionObject = context.GetInput<TopicActionObject>();
 
-            // Send the object to the URLShortenerService
-            Task<string> shortURL = context.CallActivityAsync<string>("RetrieveShortURL", topicActionObject);
+            // By this point source url will be a short URL if the medium and platforms matched up.
+            // If the message contains a placeholder {{url}}, then replace that text with the source url.
+            // Otherwise, append it to the end of the message.
 
-            // Create a combined object, so that we can transform the urls within the summary.
-            TopicActionObjectEnvelope topicActionObjectEnvelope = new TopicActionObjectEnvelope(){
-                TopicActionObject = topicActionObject,
-                ShortURL = await shortURL
-            };
-
-            // Update the message contents to include the url
-            Task<TopicActionObject> convertedTopicActionObject = context.CallActivityAsync<TopicActionObject>("UpdateMessageWithShortURL", topicActionObjectEnvelope);
-
+            if (topicActionObject.Message != null)
+            {
+                if (topicActionObject.Message.Contains("{{url}}"))
+                {
+                    topicActionObject.Message = topicActionObject.Message.Replace("{{url}}", topicActionObject.Source);
+                }
+                else
+                {
+                    topicActionObject.Message = $"{topicActionObject.Message}\n\n{topicActionObject.Source}";
+                }
+            } else
+            {
+                topicActionObject.Message = topicActionObject.Source;
+            }
 
             // Send the resulting object to the Service Bus Topic
-            Task sentToTopic = context.CallActivityAsync("SendToTopic", convertedTopicActionObject);
+            Task sentToTopic = context.CallActivityAsync("SendToTopic", topicActionObject);
 
             await Task.WhenAll(sentToTopic);
         }
 
         [FunctionName("RetrieveShortURL")]
-        public async static Task<Uri> RetrieveShortURL
+        public async static Task<List<URLMapping>> RetrieveShortURL
         (
-            [ActivityTrigger] TopicActionObject topicActionObject,
+            [ActivityTrigger] ContentAndActionObject contentAndActionObject,
             ILogger log
         )
         {
-            // To Do: Implement the short URL fetcher...
-            return new Uri("http://cloudchris.ws");
-        }
+            // Get a distinct list of the platforms request for this URL.
+            List<List<string>> platformsAcrossActions = contentAndActionObject.Actions.Select(e => e.Platforms).ToList();
+            List<string> flattenedList = (from list in platformsAcrossActions
+                                       from item in list
+                                       select item).ToList();
+            List<string> platforms = flattenedList.Distinct().ToList();
 
-        [FunctionName("UpdateMessageWithShortURL")]
-        public async static Task<TopicActionObject> UpdateMessageWithShortURL
-        (
-            [ActivityTrigger] TopicActionObjectEnvelope topicActionObjectEnvelope,
-            ILogger log
-        )
-        {
-            // To do - implement the functionality to either add (?) or replace (?) urls in the body.
-            return topicActionObjectEnvelope.TopicActionObject;
+            // Create the Request Object to be sent to the URL Shortener
+            URLShortenerRequest urlShortenerRequest = new URLShortenerRequest()
+            {
+                Title = contentAndActionObject.Title,
+                Input = contentAndActionObject.Source,
+                Mediums = platforms
+            };
+
+
+            string responseData;
+            var baseAddress = new Uri("http://localhost:7071/");
+            string apiEndpoint = $"api/ShortenUrl?code={contentAndActionObject.code}";
+
+            using (var httpClient = new HttpClient { BaseAddress = baseAddress })
+            {
+                using (var response = await httpClient.PostAsync(apiEndpoint, new StringContent(JsonConvert.SerializeObject(urlShortenerRequest))))
+                {
+                    responseData = await response.Content.ReadAsStringAsync();
+                }
+            }
+
+            List<URLMapping> listOfURLs = JsonConvert.DeserializeObject<List<URLMapping>>(responseData);
+            return listOfURLs;
         }
 
         
         [FunctionName("SendToTopic")]
-        public async static Task SendToTopic
+        public static Task SendToTopic
         (
             [ActivityTrigger] TopicActionObject topicActionObject,
+            [ServiceBus("actions", Connection = "ServiceBusActionsTopicSendConnection", EntityType = EntityType.Topic)] out Message queueMessage,
             ILogger log
         )
         {
-            // To do - implement the functionality to TRY and send a message to the queue...
+            queueMessage = new Message();
+            queueMessage.Body = Encoding.ASCII.GetBytes(JsonConvert.SerializeObject(topicActionObject));
+            queueMessage.UserProperties.Add("platform", topicActionObject.Platform);
+            queueMessage.UserProperties.Add("actionType", topicActionObject.ActionType);
+            return Task.CompletedTask;
         }
 
     }
