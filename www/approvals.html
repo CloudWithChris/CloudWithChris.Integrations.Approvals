@@ -127,7 +127,7 @@
                     var _this = this
                     $.ajax({
                         type: 'GET',
-                        url: `${_this.baseUrl}/api/content`,
+                        url: `${_this.baseUrl}/api/content?code=${_this.code}`,
                         contentType: 'application/json',
                         success: function (data) {
                             _this.content = JSON.parse(data);

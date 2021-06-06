@@ -136,8 +136,9 @@ namespace CloudWithChris.Integrations.Approvals.Functions
 
 
             string responseData;
-            var baseAddress = new Uri("http://localhost:7071/");
-            string apiEndpoint = $"api/ShortenUrl?code={contentAndActionObject.code}";
+            Uri baseAddress = new Uri(System.Environment.GetEnvironmentVariable("UrlShortenerAPIHostname"));
+            //var baseAddress = new Uri("http://localhost:7071/");
+            string apiEndpoint = $"api/ShortenUrl?code={System.Environment.GetEnvironmentVariable("UrlShortenerApiKey")}";
 
             using (var httpClient = new HttpClient { BaseAddress = baseAddress })
             {
