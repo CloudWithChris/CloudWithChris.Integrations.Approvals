@@ -28,6 +28,7 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             // Firstly, use the RetrieveShortUrl Activity function to obtain all of the needed URL Mappings
             List<Task> taskList = new List<Task>();
             Task<List<URLMapping>> urlMappings = context.CallActivityAsync<List<URLMapping>>("RetrieveShortURL", contentAndActions);
+            (await urlMappings).Where(e => e.ShortUrl.Contains("localhost")).Select(e => { e.ShortUrl = e.ShortUrl.Replace("http://localhost", "https://cloudchris.ws").Replace("cloudchris-ws-url-func.azurewebsites.net", "cloudchris.ws"); return e; }).ToList();
             
             // Loop through each action that was added
             for (int actionPtr = 0; actionPtr < contentAndActions.Actions.Count; actionPtr++)
@@ -149,7 +150,6 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             }
 
             List<URLMapping> listOfURLs = JsonConvert.DeserializeObject<List<URLMapping>>(responseData);
-            listOfURLs.ForEach(e => e.ShortUrl = e.ShortUrl.Replace("http://localhost", "https://cloudchris.ws"));
             return listOfURLs;
         }
 

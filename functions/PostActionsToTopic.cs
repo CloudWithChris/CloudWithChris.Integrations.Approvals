@@ -41,10 +41,11 @@ namespace CloudWithChris.Integrations.Approvals.Functions
 
                 log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
 
-                return req.CreateResponse(System.Net.HttpStatusCode.OK, JsonConvert.SerializeObject($"Started orchestration with ID {instanceId}"), "text/json");
+                return req.CreateResponse(System.Net.HttpStatusCode.OK);
             } catch (Exception ex)
             {
-                return req.CreateResponse(System.Net.HttpStatusCode.InternalServerError, ex.Message);
+                log.LogError($"HTTP 500 returned due to {ex.Message}");
+                return req.CreateResponse(System.Net.HttpStatusCode.InternalServerError);
             }
         }
 
