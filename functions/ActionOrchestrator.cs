@@ -149,6 +149,7 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             }
 
             List<URLMapping> listOfURLs = JsonConvert.DeserializeObject<List<URLMapping>>(responseData);
+            listOfURLs.ForEach(e => e.ShortUrl = e.ShortUrl.Replace("http://localhost", "https://cloudchris.ws"));
             return listOfURLs;
         }
 

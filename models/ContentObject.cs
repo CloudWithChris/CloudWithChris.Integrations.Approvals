@@ -51,7 +51,8 @@ namespace CloudWithChris.Integrations.Approvals.Models
                 Title = todoTable.Title,
                 Source = todoTable.Source,
                 ContentType = todoTable.ContentType,
-                Actions = new List<Action>()
+                Actions = new List<Action>(),
+                Summary = todoTable.Summary
             };
         }
     }

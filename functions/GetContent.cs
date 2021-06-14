@@ -1,4 +1,3 @@
-using System.IO;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
@@ -8,12 +7,11 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Microsoft.Azure.Cosmos.Table;
 using CloudWithChris.Integrations.Approvals.Models;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace CloudWithChris.Integrations.Approvals.Functions
 {
-    public static class GetContent
+  public static class GetContent
     {
         [FunctionName("GetContent")]
         public static async Task<IActionResult> Run(

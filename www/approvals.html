@@ -14,7 +14,7 @@
                     <h1>Pending Approvals</h1>
                     <p>Base URL: {{baseUrl}}</p>
                     <div>
-                      <b-form-input v-model="code" placeholder="Enter the password"></b-form-input>
+                      <b-form-input v-model="code" type="password" placeholder="Enter the password"></b-form-input>
                     </div>
                     <b-card no-body class="mt-4" v-for="item, contentIndex in content" :key="item.title">
                         <b-card-header header-tag="nav">
@@ -28,14 +28,14 @@
                                     </h2>
                                 </span>
                                 <b-button-group class="mt-3">
-                                    <b-button variant="success" @click="approveContentAndActions(item.id, contentIndex)">Approve</b-button>
+                                    <b-button variant="success" @click="approveContentAndActions(item.id, contentIndex)" :disabled="showApprove(item).boolean">Approve</b-button>
                                     <b-button variant="danger" @click="confirmReject(item.id, contentIndex)">Reject</b-button>
                                 </b-button-group>
                             </div>
                         </b-card-header>
                         <b-card-body>
                             <p class="card-text mt-2">
-                                This is the description of the blog title.
+                                {{ item.summary }}
                             </p>
                             <p>                
                                 <b-button-group>
@@ -61,7 +61,8 @@
                                             <b-button variant="warning" size="sm" @click="removeAction(contentIndex, actionIndex)">Remove</b-button>
                                         </b-button-group>
                                     </div>
-                                    <p>{{ action.message }}</p>          
+                                    <p>{{ renderContent(action.message, item.source).length}} Characters</p>
+                                    <p style="white-space: pre-wrap; word-wrap: break-word;">{{ renderContent(action.message, item.source) }}</p>          
                                     <b-form-group label="Choose Action Type:">
                                         <b-form-checkbox-group
                                             v-model="action.actionTypes"
@@ -98,7 +99,6 @@
             var app = new Vue({
 
                 el: '#app',
-
                 data() 
                 {
                     return {
@@ -140,10 +140,31 @@
                     this.showAlert = false;
                     this.busy = false;
                 },
-
                 watch: {
                 },
                 methods: {
+                    showApprove(item) {
+                        const hasContent = (currentValue) => (currentValue.message.length > 0);
+                        const hasActionTypes = (currentValue) => (currentValue.actionTypes.length > 0);
+                        const hasPlatforms = (currentValue) => (currentValue.platforms.length > 0);
+
+                        if (item.actions.length > 0 && item.actions.every(hasContent) && item.actions.every(hasActionTypes) && item.actions.every(hasPlatforms))
+                        {
+                            // return false, i.e. the item is NOT disabled
+                            return {
+                                boolean: false,
+                                colour: "#000000"
+                            }
+                        } else {
+                            return {
+                                boolean: true,
+                                colour: "#FF0000"
+                            }
+                        }
+                    },
+                    renderContent(content, url) {
+                        return content.replace("{{url}}", url)
+                    },
                     addAction: function(id, index)
                     {
                         if (!Array.isArray(this.content[index].actions))
@@ -184,7 +205,7 @@
 
                             $.ajax({
                                 type: 'DELETE',
-                                url: `${_this.baseUrl}/api/content/${objectId}`,
+                                url: `${_this.baseUrl}/api/content/${objectId}?code=${_this.code}`,
                                 contentType: 'application/json',
                                 success: function (data) {
                                     _this.content.splice(contentIndex, 1)
@@ -204,15 +225,25 @@
                         });
                     },
                     rejectContentAndActions: function(id, contentIndex)
-                    {
-                        this.content.splice(contentIndex, 1)
-
-                        // Call to the API to remove it from the store here.
-
-                        console.log("Deleted item with id:" + id )
-                        this.itemPendingDelete = {
-                            title: ""
-                        }
+                    {   
+                        var _this = this
+                        $.ajax({
+                            type: 'DELETE',
+                            url: `${_this.baseUrl}/api/content/${id}?code=${_this.code}`,
+                            contentType: 'application/json',
+                            success: function (data) {
+                                var title = _this.content[contentIndex].title;
+                                _this.content.splice(contentIndex, 1)
+                                _this.itemPendingDelete = {
+                                    title: ""
+                                }
+                                // Todo - Add a popup, or banner or something similar
+                                alert("Hooray! " + title + "Successfully removed from list");
+                            },
+                            error: function (data) {
+                                console.log(data);
+                            }
+                        });
                     },
                     resetModal: function()
                     {
