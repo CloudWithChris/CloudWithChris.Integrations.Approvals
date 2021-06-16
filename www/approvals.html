@@ -63,15 +63,57 @@
                                     </div>
                                     <p>{{ renderContent(action.message, item.source).length}} Characters</p>
                                     <p style="white-space: pre-wrap; word-wrap: break-word;">{{ renderContent(action.message, item.source) }}</p>          
-                                    <b-form-group label="Choose Action Type:">
+                                    <b-form-group              
+                                        label-cols-sm="4"
+                                        label-cols-lg="3"
+                                        content-cols-sm
+                                        content-cols-lg="7"
+                                        label="Choose Action Type:">
                                         <b-form-checkbox-group
                                             v-model="action.actionTypes"
                                             :options="actionTypeOptions" />
                                     </b-form-group>                                 
-                                    <b-form-group label="Choose Platforms:">
+                                    <b-form-group           
+                                        label-cols-sm="4"
+                                        label-cols-lg="3"
+                                        content-cols-sm
+                                        content-cols-lg="7"
+                                        label="Choose Platforms:">
                                         <b-form-checkbox-group
                                             v-model="action.platforms"
                                             :options="platformOptions" />
+                                    </b-form-group>
+                                                                     
+                                    <b-form-group   
+                                        v-show="showRedditControls(action)"
+                                        :id="`reddit-{action.id}`"      
+                                        label-cols-sm="4"
+                                        label-cols-lg="3"
+                                        content-cols-sm
+                                        content-cols-lg="7"
+                                        label="Enter the Subreddits where you'd like to post the content:">
+                                        <b-form-tags 
+                                            @input="doAThing(contentIndex, actionIndex, $event)"
+                                            :id="`${action.id}-subreddits`"
+                                            v-model="action.metadata.subreddits"
+                                            separator=" ,;"
+                                            placeholder="Enter your subreddit, e.g. r/azure would just be azure"></b-form-tags>
+                                    </b-form-group>
+
+                                        
+                                    <b-form-group   
+                                        v-for="subreddit in action.metadata.subreddits" :key="subreddit"
+                                        :id="`reddit-{action.id}`"      
+                                        label-cols-sm="4"
+                                        label-cols-lg="3"
+                                        content-cols-sm
+                                        content-cols-lg="7"
+                                        :label="`Flair for r/ ${subreddit}:`">
+                                        <b-form-input 
+                                            :id="`${action.id}-subreddit-${subreddit}`"
+                                            v-model="action.metadata.flairs[subreddit]"
+                                            separator=" ,;"
+                                            :placeholder="`Enter the flair here for r/${subreddit} `">
                                     </b-form-group>
                                     <b-form-textarea
                                           rows="3"
@@ -105,7 +147,24 @@
                         baseUrl: apiRoot,
                         busy: false,
                         code: "123456789",
-                        content: [],
+                        content: [
+                            {
+                                "id": "8834de7b-50b1-49d0-b8c1-15ece494e3f3",
+                                "title": "37 - Your Career and Your Mental Health",
+                                "contentType": "episode",
+                                "source": "https://www.cloudwithchris.com/episode/your-career-and-your-mental-health/",
+                                "summary": "People often talk about work life balance, how its not working for them, and how they feel pushed over the limit. Lets dig into it a little, look at how it can be managed, and address some difficult truths as well.",
+                                actions: []
+                            },
+                            {
+                                "id": "5369d535-5fba-4694-8ee7-14766775f6e1",
+                                "title": "Using Azure Arc for Apps - Part 5 - Deploying an Azure API Management gateway to an Azure Arc enabled Kubernetes Cluster",
+                                "contentType": "blog",
+                                "source": "https://www.cloudwithchris.com/episode/your-career-and-your-mental-health/",
+                                "summary": "In part 1 of this Using Azure Arc for Apps series, we explored Azure Arc and Azure Arc enabled Kubernetes clusters. In this post, we’ll be exploring API Management on Azure Arc. At time of writing, this approach is in public preview, so we may see certain limitations / features that are not yet available.",
+                                actions: []
+                            }
+                        ],
                         itemPendingDelete: {
                             title: ""
                         },
@@ -123,7 +182,7 @@
                         ]
                     }
                 },
-                created: function () {
+                created: function () {/*
                     var _this = this
                     $.ajax({
                         type: 'GET',
@@ -136,13 +195,40 @@
                             console.log(data);
                         },
                     })
-                    console.log(this.content);
+                    console.log(this.content);*/
                     this.showAlert = false;
                     this.busy = false;
                 },
-                watch: {
-                },
                 methods: {
+                    doAThing(contentIndex,actionIndex,event){
+                        var list = event;
+
+                        // Add any new items in the list to the model
+                        for(const item of list){
+                            if (!this.content[contentIndex].actions[actionIndex].metadata.flairs[item])
+                            {
+                                this.content[contentIndex].actions[actionIndex].metadata.flairs[item] = "";
+                            }
+                        }
+
+                        // Remove any items from the model that have been removed from the list
+                        for (const item in this.content[contentIndex].actions[actionIndex].metadata.flairs)
+                        {
+                            if (!list.includes(item))
+                            {
+                                delete this.content[contentIndex].actions[actionIndex].metadata.flairs[item]
+                            }
+                        }
+
+                        console.log(this.content[contentIndex].actions[actionIndex]);
+                    },
+                    showRedditControls(action){
+                        if(action.platforms.includes("reddit")){
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    },
                     showApprove(item) {
                         const hasContent = (currentValue) => (currentValue.message.length > 0);
                         const hasActionTypes = (currentValue) => (currentValue.actionTypes.length > 0);
@@ -176,7 +262,11 @@
                             {
                                 "actionTypes": [],
                                 "message": "",
-                                "platforms": []
+                                "platforms": [],
+                                "metadata": {
+                                    "subreddits": [],
+                                    "flairs": {}
+                                }
                             }
                         )
                     },
@@ -192,6 +282,8 @@
                     },
                     approveContentAndActions: function(id, contentIndex)
                     {
+                        console.log(JSON.stringify(this.content[contentIndex]))
+                        /*
                         var _this = this
                         $.ajax({
                             type: 'POST',
@@ -222,7 +314,7 @@
                         }).fail(function (err) {
                             alert("Uh oh " + err);
                             console.log(err);
-                        });
+                        });*/
                     },
                     rejectContentAndActions: function(id, contentIndex)
                     {   
