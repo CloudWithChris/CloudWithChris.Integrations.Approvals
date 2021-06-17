@@ -77,6 +77,14 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                         {
                             for (int i = 0; i < contentAndActions.Actions[actionPtr].Metadata.SubReddits.Count; i++)
                             {
+                                string _flair;
+                                if (contentAndActions.Actions[actionPtr].Metadata.Flairs.ContainsKey(contentAndActions.Actions[actionPtr].Metadata.SubReddits[i]))
+                                {
+                                    _flair = contentAndActions.Actions[actionPtr].Metadata.Flairs[contentAndActions.Actions[actionPtr].Metadata.SubReddits[i]];
+                                } else
+                                {
+                                    _flair = "";
+                                }
                                 taskList.Add(
                                     context.CallActivityAsync("SendToTopic",
                                         new TopicActionObject()
@@ -90,7 +98,7 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                                             Source = _source,
                                             Summary = contentAndActions.Summary,
                                             Subreddit = contentAndActions.Actions[actionPtr].Metadata.SubReddits[i],
-                                            Flair = contentAndActions.Actions[actionPtr].Metadata.Flairs[contentAndActions.Actions[actionPtr].Metadata.SubReddits[i]]
+                                            Flair = _flair
                                         }
                                     )
 

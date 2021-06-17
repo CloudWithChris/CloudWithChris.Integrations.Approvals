@@ -107,11 +107,13 @@
                                                   label-cols-lg="3"
                                                   content-cols-sm
                                                   content-cols-lg="7"
-                                                  :label="`Flair for r/ ${subreddit}:`">
+                                                  :label="`Flair for r/ ${subreddit}:`"
+                                                  v-if="!flairOptions[item + '_loading']">
+
                                             <select :id="`${action.id}-subreddit-${subreddit}`"
+                                                    v-if="!flairOptions[item + '_loading']"
                                                     v-model="action.metadata.flairs[subreddit]"
                                                     :placeholder="`Enter the flair here for r/${subreddit} `">
-                                                <option v-bind:value="null">Please select an option</option>
                                                 <option v-for="flair in flairOptions[subreddit]" v-bind:value="flair.id">{{ flair.text }}</option>
                                             </select>
                                     </b-form-group>
@@ -147,24 +149,7 @@
                         baseUrl: apiRoot,
                         busy: false,
                         code: "123456789",
-                        content: [
-                            {
-                                "id": "8834de7b-50b1-49d0-b8c1-15ece494e3f3",
-                                "title": "37 - Your Career and Your Mental Health",
-                                "contentType": "episode",
-                                "source": "https://www.cloudwithchris.com/episode/your-career-and-your-mental-health/",
-                                "summary": "People often talk about work life balance, how its not working for them, and how they feel pushed over the limit. Lets dig into it a little, look at how it can be managed, and address some difficult truths as well.",
-                                actions: []
-                            },
-                            {
-                                "id": "5369d535-5fba-4694-8ee7-14766775f6e1",
-                                "title": "Using Azure Arc for Apps - Part 5 - Deploying an Azure API Management gateway to an Azure Arc enabled Kubernetes Cluster",
-                                "contentType": "blog",
-                                "source": "https://www.cloudwithchris.com/episode/your-career-and-your-mental-health/",
-                                "summary": "In part 1 of this Using Azure Arc for Apps series, we explored Azure Arc and Azure Arc enabled Kubernetes clusters. In this post, we’ll be exploring API Management on Azure Arc. At time of writing, this approach is in public preview, so we may see certain limitations / features that are not yet available.",
-                                actions: []
-                            }
-                        ],
+                        content: [],
                         flairOptions: {},
                         itemPendingDelete: {
                             title: ""
@@ -183,7 +168,7 @@
                         ]
                     }
                 },
-                created: function () {/*
+                created: function () {
                     var _this = this
                     $.ajax({
                         type: 'GET',
@@ -196,7 +181,7 @@
                             console.log(data);
                         },
                     })
-                    console.log(this.content);*/
+                    console.log(this.content);
                     this.showAlert = false;
                     this.busy = false;
                 },
@@ -209,16 +194,19 @@
                         for(const item of list){
                             if (!this.content[contentIndex].actions[actionIndex].metadata.flairs[item])
                             {
+                                _this.flairOptions[item + "_loading"] = true;
                                 $.ajax({
                                     type: 'GET',
                                     url: `${_this.baseUrl}/api/flair/${item}?code=${_this.code}`,
                                     contentType: 'application/json'
                                 })
                                 .done(function (data) {
-                                    _this.flairOptions[item] = JSON.parse(JSON.stringify(data));
+                                    Vue.set(_this.flairOptions, item, JSON.parse(JSON.stringify(data)))
                                     _this.content[contentIndex].actions[actionIndex].metadata.flairs[item] = null;
+                                    _this.flairOptions[item + "_loading"] = false;
                                     console.log(data);
                                 }).fail(function (err) {
+                                    _this.flairOptions[item + "_loading"] = false;
                                     alert("Uh oh " + err);
                                     console.log(err);
                                 });
