@@ -101,19 +101,19 @@
                                     </b-form-group>
 
                                         
-                                    <b-form-group   
-                                        v-for="subreddit in action.metadata.subreddits" :key="subreddit"
-                                        :id="`reddit-{action.id}`"      
-                                        label-cols-sm="4"
-                                        label-cols-lg="3"
-                                        content-cols-sm
-                                        content-cols-lg="7"
-                                        :label="`Flair for r/ ${subreddit}:`">
-                                        <b-form-input 
-                                            :id="`${action.id}-subreddit-${subreddit}`"
-                                            v-model="action.metadata.flairs[subreddit]"
-                                            separator=" ,;"
-                                            :placeholder="`Enter the flair here for r/${subreddit} `">
+                                    <b-form-group v-for="subreddit in action.metadata.subreddits" :key="subreddit"
+                                                  :id="`reddit-{action.id}`"
+                                                  label-cols-sm="4"
+                                                  label-cols-lg="3"
+                                                  content-cols-sm
+                                                  content-cols-lg="7"
+                                                  :label="`Flair for r/ ${subreddit}:`">
+                                            <select :id="`${action.id}-subreddit-${subreddit}`"
+                                                    v-model="action.metadata.flairs[subreddit]"
+                                                    :placeholder="`Enter the flair here for r/${subreddit} `">
+                                                <option v-bind:value="null">Please select an option</option>
+                                                <option v-for="flair in flairOptions[subreddit]" v-bind:value="flair.id">{{ flair.text }}</option>
+                                            </select>
                                     </b-form-group>
                                     <b-form-textarea
                                           rows="3"
@@ -165,6 +165,7 @@
                                 actions: []
                             }
                         ],
+                        flairOptions: {},
                         itemPendingDelete: {
                             title: ""
                         },
@@ -202,12 +203,25 @@
                 methods: {
                     doAThing(contentIndex,actionIndex,event){
                         var list = event;
+                        var _this = this;
 
                         // Add any new items in the list to the model
                         for(const item of list){
                             if (!this.content[contentIndex].actions[actionIndex].metadata.flairs[item])
                             {
-                                this.content[contentIndex].actions[actionIndex].metadata.flairs[item] = "";
+                                $.ajax({
+                                    type: 'GET',
+                                    url: `${_this.baseUrl}/api/flair/${item}?code=${_this.code}`,
+                                    contentType: 'application/json'
+                                })
+                                .done(function (data) {
+                                    _this.flairOptions[item] = JSON.parse(JSON.stringify(data));
+                                    _this.content[contentIndex].actions[actionIndex].metadata.flairs[item] = null;
+                                    console.log(data);
+                                }).fail(function (err) {
+                                    alert("Uh oh " + err);
+                                    console.log(err);
+                                });
                             }
                         }
 
