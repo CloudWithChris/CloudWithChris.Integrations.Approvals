@@ -49,7 +49,6 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             }
         }
 
-
         private static HttpResponseMessage SecurityCheck(HttpRequestMessage req)
         {
             return req.IsLocal() || req.RequestUri.Scheme == "https" ? null :

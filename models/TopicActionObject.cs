@@ -29,5 +29,12 @@ namespace CloudWithChris.Integrations.Approvals.Models
 
         [JsonProperty("platform")]
         public string Platform;
+        [JsonProperty("metadata")]
+        public Metadata Metadata;
+        [JsonProperty("subreddit")]
+        public string Subreddit;
+        [JsonProperty("flair")]
+        public string Flair;
+
     }
 }

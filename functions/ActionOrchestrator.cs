@@ -56,19 +56,55 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                             _source = shortUrlMapping.ShortUrl;
                         }
 
-                        TopicActionObject topicActionObject = new TopicActionObject()
-                        {
-                            Id = contentAndActions.Id,
-                            Title = contentAndActions.Title,
-                            ContentType = contentAndActions.ContentType,
-                            Source = _source,
-                            Summary = contentAndActions.Summary,
-                            ActionType = _actionType,
-                            Platform = _platform,
-                            Message = contentAndActions.Actions[actionPtr].Message
-                        };
 
-                        taskList.Add(context.CallSubOrchestratorAsync("TopicActionTransformAndSend", topicActionObject));
+                        if (_platform != "reddit")
+                        {
+                            TopicActionObject topicActionObject = new TopicActionObject()
+                            {
+                                Id = contentAndActions.Id,
+                                Title = contentAndActions.Title,
+                                ContentType = contentAndActions.ContentType,
+                                Source = _source,
+                                Summary = contentAndActions.Summary,
+                                ActionType = _actionType,
+                                Platform = _platform,
+                                Message = contentAndActions.Actions[actionPtr].Message,
+                                Metadata = contentAndActions.Actions[actionPtr].Metadata
+                            };
+
+                            taskList.Add(context.CallSubOrchestratorAsync("TopicActionTransformAndSend", topicActionObject));
+                        } else
+                        {
+                            for (int i = 0; i < contentAndActions.Actions[actionPtr].Metadata.SubReddits.Count; i++)
+                            {
+                                string _flair;
+                                if (contentAndActions.Actions[actionPtr].Metadata.Flairs.ContainsKey(contentAndActions.Actions[actionPtr].Metadata.SubReddits[i]))
+                                {
+                                    _flair = contentAndActions.Actions[actionPtr].Metadata.Flairs[contentAndActions.Actions[actionPtr].Metadata.SubReddits[i]];
+                                } else
+                                {
+                                    _flair = "";
+                                }
+                                taskList.Add(
+                                    context.CallActivityAsync("SendToTopic",
+                                        new TopicActionObject()
+                                        {
+                                            Title = contentAndActions.Title,
+                                            ActionType = _actionType,
+                                            ContentType = contentAndActions.ContentType,
+                                            Message = contentAndActions.Actions[actionPtr].Message,
+                                            Id = contentAndActions.Id,
+                                            Platform = _platform,
+                                            Source = _source,
+                                            Summary = contentAndActions.Summary,
+                                            Subreddit = contentAndActions.Actions[actionPtr].Metadata.SubReddits[i],
+                                            Flair = _flair
+                                        }
+                                    )
+
+                                );
+                            }
+                        }                       
                     }
                 }
             }
@@ -107,11 +143,14 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                 topicActionObject.Message = topicActionObject.Source;
             }
 
-            // Send the resulting object to the Service Bus Topic
-            Task sentToTopic = context.CallActivityAsync("SendToTopic", topicActionObject);
+            Task task;
 
-            await Task.WhenAll(sentToTopic);
+            // Send the resulting object to the Service Bus Topic
+            task = context.CallActivityAsync("SendToTopic", topicActionObject);
+
+            await Task.WhenAll(task);
         }
+
 
         [FunctionName("RetrieveShortURL")]
         public async static Task<List<URLMapping>> RetrieveShortURL
