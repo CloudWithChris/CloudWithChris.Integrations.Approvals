@@ -15,8 +15,45 @@
                     <p>Base URL: {{baseUrl}}</p>
                     <div>
                       <b-form-input v-model="code" type="password" placeholder="Enter the password"></b-form-input>
+                      <div>
+                        <b-form-group label="Content types" label-for="contenttype-select">
+                          <!-- Prop `add-on-change` is needed to enable adding tags vie the `change` event -->
+                          <b-form-tags
+                            id="contenttype-select"
+                            v-model="filteredContentTypeValues"
+                            size="lg"
+                            class="mb-2"
+                            add-on-change
+                            no-outer-focus
+                          >
+                            <template v-slot="{ tags, inputAttrs, inputHandlers, disabled, removeTag }">
+                              <ul v-if="tags.length > 0" class="list-inline d-inline-block mb-2">
+                                <li v-for="tag in tags" :key="tag" class="list-inline-item">
+                                  <b-form-tag
+                                    @remove="removeTag(tag)"
+                                    :title="tag"
+                                    :disabled="disabled"
+                                    variant="info"
+                                  >{{ tag }}</b-form-tag>
+                                </li>
+                              </ul>
+                              <b-form-select
+                                v-bind="inputAttrs"
+                                v-on="inputHandlers"
+                                :disabled="disabled || availableOptions.length === 0"
+                                :options="availableOptions"
+                              >
+                                <template #first>
+                                  <!-- This is required to prevent bugs with Safari -->
+                                  <option disabled value="">Choose a tag...</option>
+                                </template>
+                              </b-form-select>
+                            </template>
+                          </b-form-tags>
+                        </b-form-group>
+                      </div>
                     </div>
-                    <b-card no-body class="mt-4" v-for="item, contentIndex in content" :key="item.title">
+                    <b-card no-body class="mt-4" v-for="item, contentIndex in filteredContent" :key="item.title">
                         <b-card-header header-tag="nav">
                             <div class="d-flex w-100 justify-content-between align-items-center">
                                 <span>                                
@@ -28,7 +65,7 @@
                                     </h2>
                                 </span>
                                 <b-button-group class="mt-3">
-                                    <b-button variant="success" @click="approveContentAndActions(item.id, contentIndex)" :disabled="showApprove(item).boolean">Approve</b-button>
+                                    <b-button variant="success" @click="approveContentAndActions(item.id)" :disabled="showApprove(item).boolean">Approve</b-button>
                                     <b-button variant="danger" @click="confirmReject(item.id, contentIndex)">Reject</b-button>
                                 </b-button-group>
                             </div>
@@ -39,7 +76,7 @@
                             </p>
                             <p>                
                                 <b-button-group>
-                                    <b-button variant="primary" @click="addAction(item.id, contentIndex)">Add Action</b-button>
+                                    <b-button variant="primary" @click="addAction(item.id)">Add Action</b-button>
                                 </b-button-group>
                             </p>
                             <b-list-group v-for="action, actionIndex in item.actions" :key="action.id">
@@ -58,7 +95,7 @@
                                             </span>
                                         </span>
                                         <b-button-group>
-                                            <b-button variant="warning" size="sm" @click="removeAction(contentIndex, actionIndex)">Remove</b-button>
+                                            <b-button variant="warning" size="sm" @click="removeAction(item.id, actionIndex)">Remove</b-button>
                                         </b-button-group>
                                     </div>
                                     <p>{{ renderContent(action.message, item.source).length}} Characters</p>
@@ -93,7 +130,7 @@
                                         content-cols-lg="7"
                                         label="Enter the Subreddits where you'd like to post the content:">
                                         <b-form-tags 
-                                            @input="doAThing(contentIndex, actionIndex, $event)"
+                                            @input="doAThing(item.id, actionIndex, $event)"
                                             :id="`${action.id}-subreddits`"
                                             v-model="action.metadata.subreddits"
                                             separator=" ,;"
@@ -130,7 +167,7 @@
                         ref="confirmationModal"
                         :title="itemPendingDelete.title"
                         @hidden="resetModal"
-                        @ok="rejectContentAndActions(itemPendingDelete.id, itemPendingDelete.position)">
+                        @ok="rejectContentAndActions(itemPendingDelete.id)">
                         <p><strong>Are you sure you want to reject this Content?</strong></p>
                         <p>This means any actions that you have entered will also be ignored / removed.</p>
                     </b-modal>
@@ -143,6 +180,21 @@
             var app = new Vue({
 
                 el: '#app',
+                computed: {
+                    availableOptions() {
+                      return this.options.filter(opt => this.filteredContentTypeValues.indexOf(opt) === -1)
+                    },
+                    filteredContent() {
+                        if (Array.isArray(this.filteredContentTypeValues) && !this.filteredContentTypeValues.length) {
+                            return this.content
+                        } else {
+                            return this.content.filter(item => this.filteredContentTypeValues.includes(item.contentType))
+                        }
+                    },
+                    options() {
+                        return [...new Set(this.content.map(item => item.contentType))]
+                    }
+                },
                 data() 
                 {
                     return {
@@ -150,6 +202,7 @@
                         busy: false,
                         code: "123456789",
                         content: [],
+                        filteredContentTypeValues: [],
                         flairOptions: {},
                         itemPendingDelete: {
                             title: ""
@@ -186,7 +239,8 @@
                     this.busy = false;
                 },
                 methods: {
-                    doAThing(contentIndex,actionIndex,event){
+                    doAThing(id,actionIndex,event){
+                        var contentIndex = this.content.findIndex(x => x.id === id)
                         var list = event;
                         var _this = this;
 
@@ -253,14 +307,17 @@
                     renderContent(content, url) {
                         return content.replace("{{url}}", url)
                     },
-                    addAction: function(id, index)
+                    addAction: function(id)
                     {
-                        if (!Array.isArray(this.content[index].actions))
+
+                        var contentItem = this.content.find(x => x.id === id)
+
+                        if (!Array.isArray(contentItem.actions))
                         {
-                            this.content[index].actions = []
+                            contentItem.actions = []
                         }
 
-                        this.content[index].actions.push(
+                        contentItem.actions.push(
                             {
                                 "actionTypes": [],
                                 "message": "",
@@ -272,18 +329,21 @@
                             }
                         )
                     },
-                    removeAction: function(contentIndex, actionIndex)
+                    removeAction: function(id, actionIndex)
                     {
+                        var contentIndex = this.content.findIndex(x => x.id === id)
                         this.content[contentIndex].actions.splice(actionIndex, 1)
                     },
-                    confirmReject: function(id, index)
+                    confirmReject: function(id)
                     {
+                        var contentIndex = this.content.findIndex(x => x.id === id)
                         this.itemPendingDelete = this.content.find(o => o.id === id);
-                        this.itemPendingDelete.position = index;
+                        this.itemPendingDelete.position = contentIndex;
                         this.$refs['confirmationModal'].show()
                     },
-                    approveContentAndActions: function(id, contentIndex)
+                    approveContentAndActions: function(id)
                     {
+                        var contentIndex = this.content.findIndex(x => x.id === id)
                         console.log(JSON.stringify(this.content[contentIndex]))
                         
                         var _this = this
@@ -318,8 +378,9 @@
                             console.log(err);
                         });
                     },
-                    rejectContentAndActions: function(id, contentIndex)
+                    rejectContentAndActions: function(id)
                     {   
+                        var contentIndex = this.content.findIndex(x => x.id === id)
                         var _this = this
                         $.ajax({
                             type: 'DELETE',
