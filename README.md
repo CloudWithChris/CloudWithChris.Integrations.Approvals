@@ -8,7 +8,7 @@ This software is a pet side-project and currently in active development. It is t
 ## Contributing
 This project welcomes contributions and suggestions. When you submit code changes, your submissions will be understood under the same [MIT License](https://github.com/CloudWithChris/CloudWithChris.Integrations.Approvals/blob/main/LICENSE) that covers the project.
 
-For detailed guidelines, including Feature Requests, Bug Reports and Code Contributions visit the [Contributing Guide](https://github.com/CloudWithChris/CloudWithChris.Integrations.Approvals/blob/main/CONTRIBUTING.md).
+For detailed guidelines, including Feature Requests, Bug Reports and Code Contributions visit the [Contributing Guide](https://github.com/CloudWithChris/CloudWithChris.Integrations.Approvals/blob/main/contributing.md).
 
 ## Support
 If you like this project, I'd greatly appreciate your support for my blog/podcast/vlog, Cloud With Chris.
