@@ -120,7 +120,24 @@
                                             v-model="action.platforms"
                                             :options="platformOptions" />
                                     </b-form-group>
-                                                                     
+                                    
+                                    
+                                    <b-form-datepicker
+                                        :min="min"
+                                        v-show="showScheduleControls(action)"
+                                        id="schedule-date-{action.id}"
+                                        v-model="action.metadata.schedule.date"
+                                        class="mb-2">
+                                    </b-form-datepicker>
+                                    
+                                    <b-form-timepicker
+                                        id="schedule-time-{action.id}"
+                                        v-show="showScheduleControls(action)"
+                                        v-model="action.metadata.schedule.time"
+                                        locale="en">
+                                    </b-form-timepicker>
+                                    
+
                                     <b-form-group   
                                         v-show="showRedditControls(action)"
                                         :id="`reddit-{action.id}`"      
@@ -197,6 +214,12 @@
                 },
                 data() 
                 {
+
+                    const now = new Date()
+                    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+                    // 15th two months prior
+                    const minDate = new Date(today)
+
                     return {
                         baseUrl: apiRoot,
                         busy: false,
@@ -207,9 +230,11 @@
                         itemPendingDelete: {
                             title: ""
                         },
+                        min: minDate,
                         modalShow: false,
                         actionTypeOptions: [
                             { "text": "Immediate", value: "immediate" },
+                            { "text": "Queue", value: "queue" },
                             { "text": "Schedule", value: "schedule" },
                             { "text": "Roundup", value: "roundup" }
                         ],
@@ -278,6 +303,13 @@
 
                         console.log(this.content[contentIndex].actions[actionIndex]);
                     },
+                    showScheduleControls(action) {
+                        if (action.actionTypes.includes("schedule")) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    },
                     showRedditControls(action){
                         if(action.platforms.includes("reddit")){
                             return true;
@@ -323,6 +355,10 @@
                                 "message": "",
                                 "platforms": [],
                                 "metadata": {
+                                    "schedule": {
+                                        "date": "",
+                                        "time": ""
+                                    },
                                     "subreddits": [],
                                     "flairs": {}
                                 }
@@ -360,6 +396,7 @@
                             $.ajax({
                                 type: 'DELETE',
                                 url: `${_this.baseUrl}/api/content/${objectId}?code=${_this.code}`,
+                                data: JSON.stringify({ "mode": "approve" }),
                                 contentType: 'application/json',
                                 success: function (data) {
                                     _this.content.splice(contentIndex, 1)
@@ -385,6 +422,7 @@
                         $.ajax({
                             type: 'DELETE',
                             url: `${_this.baseUrl}/api/content/${id}?code=${_this.code}`,
+                            data: JSON.stringify({ "mode": "reject" }),
                             contentType: 'application/json',
                             success: function (data) {
                                 var title = _this.content[contentIndex].title;

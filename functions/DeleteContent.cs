@@ -6,6 +6,10 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Azure.Cosmos.Table;
 using System;
+using CloudWithChris.Integrations.Approvals.Models;
+using System.Linq;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace CloudWithChris.Integrations.Approvals.Functions
 {
@@ -22,8 +26,25 @@ namespace CloudWithChris.Integrations.Approvals.Functions
 
             try
             {
-                TableOperation deleteOperation = TableOperation.Delete(new TableEntity("CONTENT", id) { ETag = "*" });
-                await cloudTable.ExecuteAsync(deleteOperation);
+                int flag = 0;
+                string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+                DeleteModeMessage data = JsonConvert.DeserializeObject<DeleteModeMessage>(requestBody);
+
+                if (data.mode == "approve")
+                {
+                    flag = 1;
+                }
+                else if (data.mode == "reject")
+                {
+                    flag = -1;
+                }
+
+                var entity = new DynamicTableEntity("CONTENT", id);
+                entity.ETag = "*";
+                entity.Properties.Add("Processed", new EntityProperty(flag));
+                TableOperation mergeOperation = TableOperation.Merge(entity);
+
+                await cloudTable.ExecuteAsync(mergeOperation);
                 return new OkObjectResult("Object deleted");
             }
             catch (Exception ex)
@@ -34,3 +55,9 @@ namespace CloudWithChris.Integrations.Approvals.Functions
         }
     }
 }
+
+
+public class DeleteModeMessage
+{
+    public string mode { get; set; }
+} 
