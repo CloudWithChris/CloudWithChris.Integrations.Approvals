@@ -43,11 +43,30 @@ namespace CloudWithChris.Integrations.Approvals.Models
 
     public class Metadata
     {
+        [JsonProperty("shorternUrl")]
+        public bool ShorternUrl;
+
         [JsonProperty("subreddits")]
         public List<string> SubReddits;
 
         [JsonProperty("flairs")]
         public Dictionary<string, string> Flairs;
 
+        [JsonProperty("schedule")]
+        public ScheduleObject Schedule;
+
+
+        [JsonProperty("roundup")]
+        public List<string> Roundup;
+
+    }
+
+    public class ScheduleObject
+    {
+        [JsonProperty("date")]
+        public string Date;
+
+        [JsonProperty("time")]
+        public string Time;
     }
 }

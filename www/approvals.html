@@ -99,62 +99,92 @@
                                         </b-button-group>
                                     </div>
                                     <p>{{ renderContent(action.message, item.source).length}} Characters</p>
-                                    <p style="white-space: pre-wrap; word-wrap: break-word;">{{ renderContent(action.message, item.source) }}</p>          
-                                    <b-form-group              
-                                        label-cols-sm="4"
-                                        label-cols-lg="3"
-                                        content-cols-sm
-                                        content-cols-lg="7"
-                                        label="Choose Action Type:">
-                                        <b-form-checkbox-group
-                                            v-model="action.actionTypes"
-                                            :options="actionTypeOptions" />
-                                    </b-form-group>                                 
-                                    <b-form-group           
-                                        label-cols-sm="4"
-                                        label-cols-lg="3"
-                                        content-cols-sm
-                                        content-cols-lg="7"
-                                        label="Choose Platforms:">
-                                        <b-form-checkbox-group
-                                            v-model="action.platforms"
-                                            :options="platformOptions" />
+                                    <p style="white-space: pre-wrap; word-wrap: break-word;">{{ renderContent(action.message, item.source) }}</p>
+                                    <b-form-group label-cols-sm="4"
+                                                  label-cols-lg="3"
+                                                  content-cols-sm
+                                                  content-cols-lg="7"
+                                                  label="Choose Action Type:">
+                                        <b-form-checkbox-group v-model="action.actionTypes"
+                                                               :options="actionTypeOptions" />
                                     </b-form-group>
-                                    
-                                    
-                                    <b-form-datepicker
-                                        :min="min"
-                                        v-show="showScheduleControls(action)"
-                                        id="schedule-date-{action.id}"
-                                        v-model="action.metadata.schedule.date"
-                                        class="mb-2">
+                                    <b-form-group label-cols-sm="4"
+                                                  label-cols-lg="3"
+                                                  content-cols-sm
+                                                  content-cols-lg="7"
+                                                  label="Choose Platforms:">
+                                        <b-form-checkbox-group v-model="action.platforms"
+                                                               :options="platformOptions" />
+                                    </b-form-group>
+
+                                    <b-form-checkbox id="checkbox-1"
+                                                     v-model="action.metadata.shorternUrl"
+                                                     name="checkbox-1">
+                                        Shortern any {url} references in the message.
+                                    </b-form-checkbox>
+
+
+                                    <b-form-datepicker :min="min"
+                                                       v-show="showScheduleControls(action)"
+                                                       id="schedule-date-{action.id}"
+                                                       v-model="action.metadata.schedule.date"
+                                                       class="mb-2">
                                     </b-form-datepicker>
-                                    
-                                    <b-form-timepicker
-                                        id="schedule-time-{action.id}"
-                                        v-show="showScheduleControls(action)"
-                                        v-model="action.metadata.schedule.time"
-                                        locale="en">
-                                    </b-form-timepicker>
-                                    
 
-                                    <b-form-group   
-                                        v-show="showRedditControls(action)"
-                                        :id="`reddit-{action.id}`"      
-                                        label-cols-sm="4"
-                                        label-cols-lg="3"
-                                        content-cols-sm
-                                        content-cols-lg="7"
-                                        label="Enter the Subreddits where you'd like to post the content:">
-                                        <b-form-tags 
-                                            @input="doAThing(item.id, actionIndex, $event)"
-                                            :id="`${action.id}-subreddits`"
-                                            v-model="action.metadata.subreddits"
-                                            separator=" ,;"
-                                            placeholder="Enter your subreddit, e.g. r/azure would just be azure"></b-form-tags>
+                                    <b-form-timepicker id="schedule-time-{action.id}"
+                                                       v-show="showScheduleControls(action)"
+                                                       v-model="action.metadata.schedule.time"
+                                                       locale="en">
+                                    </b-form-timepicker>
+                                    <p v-show="showScheduleControls(action)"><font color="red">NOTE: Schedule functionality is not yet available. The approve button is disabled until you remove this option.</font></p>
+
+
+                                    <b-form-group label="Roundup Channels" label-for="tags-roundup-select" v-show="showRoundupControls(action)">
+                                        <!-- Prop `add-on-change` is needed to enable adding tags vie the `change` event -->
+                                        <b-form-tags id="tags-roundup-select"
+                                                     v-model="action.metadata.roundup"
+                                                     size="lg"
+                                                     class="mb-2"
+                                                     add-on-change
+                                                     no-outer-focus>
+                                            <template v-slot="{ tags, inputAttrs, inputHandlers, disabled, removeTag }">
+                                                <ul v-if="tags.length > 0" class="list-inline d-inline-block mb-2">
+                                                    <li v-for="tag in tags" :key="tag" class="list-inline-item">
+                                                        <b-form-tag @remove="removeTag(tag)"
+                                                                    :title="tag"
+                                                                    :disabled="disabled"
+                                                                    variant="info">{{ tag }}</b-form-tag>
+                                                    </li>
+                                                </ul>
+                                                <b-form-select v-bind="inputAttrs"
+                                                               v-on="inputHandlers"
+                                                               :disabled="disabled || availableRoundupOptions(action).length === 0"
+                                                               :options="availableRoundupOptions(action)">
+                                                    <template #first>
+                                                        <!-- This is required to prevent bugs with Safari -->
+                                                        <option disabled value="">Choose a roundup channel</option>
+                                                    </template>
+                                                </b-form-select>
+                                            </template>
+                                        </b-form-tags>
+                                    </b-form-group>
+                                    <p v-show="showRoundupControls(action)"><font color="red">NOTE: Roundup functionality is not yet available. The approve button is disabled until you remove this option.</font></p>
+
+                                    <b-form-group v-show="showRedditControls(action)"
+                                                  :id="`reddit-{action.id}`"
+                                                  label-cols-sm="4"
+                                                  label-cols-lg="3"
+                                                  content-cols-sm
+                                                  content-cols-lg="7"
+                                                  label="Enter the Subreddits where you'd like to post the content:">
+                                        <b-form-tags @input="updateRedditFlairs(item.id, actionIndex, $event)"
+                                                     :id="`${action.id}-subreddits`"
+                                                     v-model="action.metadata.subreddits"
+                                                     separator=" ,;"
+                                                     placeholder="Enter your subreddit, e.g. r/azure would just be azure"></b-form-tags>
                                     </b-form-group>
 
-                                        
+
                                     <b-form-group v-for="subreddit in action.metadata.subreddits" :key="subreddit"
                                                   :id="`reddit-{action.id}`"
                                                   label-cols-sm="4"
@@ -164,18 +194,17 @@
                                                   :label="`Flair for r/ ${subreddit}:`"
                                                   v-if="!flairOptions[item + '_loading']">
 
-                                            <select :id="`${action.id}-subreddit-${subreddit}`"
-                                                    v-if="!flairOptions[item + '_loading']"
-                                                    v-model="action.metadata.flairs[subreddit]"
-                                                    :placeholder="`Enter the flair here for r/${subreddit} `">
-                                                <option v-for="flair in flairOptions[subreddit]" v-bind:value="flair.id">{{ flair.text }}</option>
-                                            </select>
+                                        <select :id="`${action.id}-subreddit-${subreddit}`"
+                                                v-if="!flairOptions[item + '_loading']"
+                                                v-model="action.metadata.flairs[subreddit]"
+                                                :placeholder="`Enter the flair here for r/${subreddit} `">
+                                            <option v-for="flair in flairOptions[subreddit]" v-bind:value="flair.id">{{ flair.text }}</option>
+                                        </select>
                                     </b-form-group>
-                                    <b-form-textarea
-                                          rows="3"
-                                          max-rows="6"
-                                        v-model="action.message" 
-                                        placeholder="Enter your post text" />
+                                    <b-form-textarea rows="3"
+                                                     max-rows="6"
+                                                     v-model="action.message"
+                                                     placeholder="Enter your post text" />
                                 </b-list-group-item>
                             </b-list-group>
                         </b-card-body>
@@ -198,6 +227,9 @@
 
                 el: '#app',
                 computed: {
+                    availableRoundupOptions() {
+                        return action => this.roundupOptions.filter(opt => action.metadata.roundup.indexOf(opt) === -1)
+                    },
                     availableOptions() {
                       return this.options.filter(opt => this.filteredContentTypeValues.indexOf(opt) === -1)
                     },
@@ -243,7 +275,8 @@
                             { "text": "LinkedIn", value: "linkedin" },
                             { "text": "Twitter", value: "twitter" },
                             { "text": "Reddit", value: "reddit" }
-                        ]
+                        ],
+                        roundupOptions: ['Azure Weekly', 'Cloud With Chris Monthly Newsletter'],
                     }
                 },
                 created: function () {
@@ -264,7 +297,7 @@
                     this.busy = false;
                 },
                 methods: {
-                    doAThing(id,actionIndex,event){
+                    updateRedditFlairs(id,actionIndex,event){
                         var contentIndex = this.content.findIndex(x => x.id === id)
                         var list = event;
                         var _this = this;
@@ -303,6 +336,13 @@
 
                         console.log(this.content[contentIndex].actions[actionIndex]);
                     },
+                    showRoundupControls(action) {
+                        if (action.actionTypes.includes("roundup")) {
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    },
                     showScheduleControls(action) {
                         if (action.actionTypes.includes("schedule")) {
                             return true;
@@ -321,8 +361,10 @@
                         const hasContent = (currentValue) => (currentValue.message.length > 0);
                         const hasActionTypes = (currentValue) => (currentValue.actionTypes.length > 0);
                         const hasPlatforms = (currentValue) => (currentValue.platforms.length > 0);
+                        const doesNotContainSchedule = (currentValue) => (!currentValue.actionTypes.includes("schedule"));
+                        const doesNotContainRoundup = (currentValue) => (!currentValue.actionTypes.includes("roundup"));
 
-                        if (item.actions.length > 0 && item.actions.every(hasContent) && item.actions.every(hasActionTypes) && item.actions.every(hasPlatforms))
+                        if (item.actions.length > 0 && item.actions.every(hasContent) && item.actions.every(hasActionTypes) && item.actions.every(hasPlatforms) && item.actions.every(doesNotContainSchedule) && item.actions.every(doesNotContainRoundup))
                         {
                             // return false, i.e. the item is NOT disabled
                             return {
@@ -355,10 +397,12 @@
                                 "message": "",
                                 "platforms": [],
                                 "metadata": {
+                                    "shorternUrl": false,
                                     "schedule": {
                                         "date": "",
                                         "time": ""
                                     },
+                                    "roundup": [],
                                     "subreddits": [],
                                     "flairs": {}
                                 }

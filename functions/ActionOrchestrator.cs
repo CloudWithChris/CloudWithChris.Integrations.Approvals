@@ -49,13 +49,16 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                         string _platform = contentAndActions.Actions[actionPtr].Platforms[platformsPtr];
                         string _source = contentAndActions.Source;
 
-                        URLMapping shortUrlMapping = (await urlMappings).Where(e => e.LongUrl.Contains($"utm_medium={_platform}")).FirstOrDefault();
 
-                        if (shortUrlMapping != null)
+                        if (contentAndActions.Actions[actionPtr].Metadata.ShorternUrl)
                         {
-                            _source = shortUrlMapping.ShortUrl;
-                        }
+                            URLMapping shortUrlMapping = (await urlMappings).Where(e => e.LongUrl.Contains($"utm_medium={_platform}")).FirstOrDefault();
 
+                            if (shortUrlMapping != null)
+                            {
+                                _source = shortUrlMapping.ShortUrl;
+                            }
+                        }
 
                         if (_platform != "reddit")
                         {
@@ -85,24 +88,30 @@ namespace CloudWithChris.Integrations.Approvals.Functions
                                 {
                                     _flair = "";
                                 }
-                                taskList.Add(
-                                    context.CallActivityAsync("SendToTopic",
-                                        new TopicActionObject()
-                                        {
-                                            Title = contentAndActions.Title,
-                                            ActionType = _actionType,
-                                            ContentType = contentAndActions.ContentType,
-                                            Message = contentAndActions.Actions[actionPtr].Message,
-                                            Id = contentAndActions.Id,
-                                            Platform = _platform,
-                                            Source = _source,
-                                            Summary = contentAndActions.Summary,
-                                            Subreddit = contentAndActions.Actions[actionPtr].Metadata.SubReddits[i],
-                                            Flair = _flair
-                                        }
-                                    )
 
-                                );
+
+                                // Get the object that was passed in to the method
+                                TopicActionObject topicActionObject = new TopicActionObject()
+                                {
+                                    Title = contentAndActions.Title,
+                                    ActionType = _actionType,
+                                    ContentType = contentAndActions.ContentType,
+                                    Message = contentAndActions.Actions[actionPtr].Message,
+                                    Id = contentAndActions.Id,
+                                    Platform = _platform,
+                                    Source = _source,
+                                    Summary = contentAndActions.Summary,
+                                    Subreddit = contentAndActions.Actions[actionPtr].Metadata.SubReddits[i],
+                                    Flair = _flair
+                                };
+
+
+                                if (topicActionObject.ActionType == "schedule")
+                                {
+                                    topicActionObject.ScheduledDateTime = DateTime.ParseExact($"{topicActionObject.Metadata.Schedule.Date} {topicActionObject.Metadata.Schedule.Time}", "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+                                }
+
+                                taskList.Add(context.CallActivityAsync("SendToTopic", topicActionObject));
                             }
                         }                       
                     }
@@ -124,31 +133,36 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             // Get the object that was passed in to the method
             TopicActionObject topicActionObject = context.GetInput<TopicActionObject>();
 
-            // By this point source url will be a short URL if the medium and platforms matched up.
-            // If the message contains a placeholder {{url}}, then replace that text with the source url.
-            // Otherwise, append it to the end of the message.
+            // By this point source url will be a short URL if Source URL replace was selected and if the medium and platforms matched up.
+            // If the message contains a placeholder {{url}}, then replace that text with the source url. Do not include the url at the end otherwise.
 
             if (topicActionObject.Message != null)
             {
-                if (topicActionObject.Message.Contains("{{url}}"))
-                {
-                    topicActionObject.Message = topicActionObject.Message.Replace("{{url}}", topicActionObject.Source);
-                }
-                else
-                {
-                    topicActionObject.Message = $"{topicActionObject.Message}\n\n{topicActionObject.Source}";
-                }
+                topicActionObject.Message = topicActionObject.Message.Replace("{{url}}", topicActionObject.Source);
             } else
             {
                 topicActionObject.Message = topicActionObject.Source;
             }
 
+            if (topicActionObject.ActionType == "schedule")
+            {
+                topicActionObject.ScheduledDateTime = DateTime.ParseExact($"{topicActionObject.Metadata.Schedule.Date} {topicActionObject.Metadata.Schedule.Time}", "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+
             Task task;
 
-            // Send the resulting object to the Service Bus Topic
-            task = context.CallActivityAsync("SendToTopic", topicActionObject);
-
+            try
+            {
+                // Send the resulting object to the Service Bus Topic
+                task = context.CallActivityAsync("SendToTopic", topicActionObject);
             await Task.WhenAll(task);
+
+
+            } catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
         }
 
 
@@ -159,8 +173,8 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             ILogger log
         )
         {
-            // Get a distinct list of the platforms request for this URL.
-            List<List<string>> platformsAcrossActions = contentAndActionObject.Actions.Select(e => e.Platforms).ToList();
+            // Get a distinct list of the platforms request for this URL (of those that have requested to ShorternURL)
+            List<List<string>> platformsAcrossActions = contentAndActionObject.Actions.Where(e => e.Metadata.ShorternUrl == true).Select(e => e.Platforms).ToList();
             List<string> flattenedList = (from list in platformsAcrossActions
                                        from item in list
                                        select item).ToList();
@@ -204,7 +218,18 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             queueMessage = new Message();
             queueMessage.Body = Encoding.ASCII.GetBytes(JsonConvert.SerializeObject(topicActionObject));
             queueMessage.UserProperties.Add("platform", topicActionObject.Platform);
-            queueMessage.UserProperties.Add("actionType", topicActionObject.ActionType);
+
+            if (topicActionObject.ActionType == "schedule")
+            {
+                //TODO: UI currently disables schedule, because there seems to be an issue with the implementation. Work in progress.
+                queueMessage.ScheduledEnqueueTimeUtc = topicActionObject.ScheduledDateTime;
+                //Override the actionType to be immediate, so that it can be routed for immediate processing (As the message delivery will be delayed for the appropriate time).
+                queueMessage.UserProperties.Add("actionType", "immediate");
+            } else
+            {
+                queueMessage.UserProperties.Add("actionType", topicActionObject.ActionType);
+            }
+
             return Task.CompletedTask;
         }
 
