@@ -27,6 +27,8 @@ namespace CloudWithChris.Integrations.Approvals.Models
         public string Summary;
         [JsonProperty("actions")]
         public List<Action> Actions;
+        [JsonProperty("processed")]
+        public int Processed;
     }
 
     public static class ContentObjectExtensions
@@ -52,7 +54,8 @@ namespace CloudWithChris.Integrations.Approvals.Models
                 Source = todoTable.Source,
                 ContentType = todoTable.ContentType,
                 Actions = new List<Action>(),
-                Summary = todoTable.Summary
+                Summary = todoTable.Summary,
+                Processed = todoTable.Processed
             };
         }
     }
@@ -64,6 +67,7 @@ namespace CloudWithChris.Integrations.Approvals.Models
         public string Source { get; set; }
         public string ContentType { get; set; }
         public string Summary { get; set; }
+        public int Processed { get; set; }
     }
 
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
@@ -33,6 +34,8 @@ namespace CloudWithChris.Integrations.Approvals.Models
         public Metadata Metadata;
         [JsonProperty("subreddit")]
         public string Subreddit;
+        [JsonProperty("scheduledDateTime")]
+        public DateTime ScheduledDateTime;
         [JsonProperty("flair")]
         public string Flair;
 
