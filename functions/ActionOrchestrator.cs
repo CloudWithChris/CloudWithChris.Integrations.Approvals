@@ -189,20 +189,27 @@ namespace CloudWithChris.Integrations.Approvals.Functions
             };
 
 
-            string responseData;
-            Uri baseAddress = new Uri(System.Environment.GetEnvironmentVariable("UrlShortenerAPIHostname"));
-            //var baseAddress = new Uri("http://localhost:7071/");
-            string apiEndpoint = $"api/ShortenUrl?code={System.Environment.GetEnvironmentVariable("UrlShortenerApiKey")}";
+            List<URLMapping> listOfURLs = new List<URLMapping>();
 
-            using (var httpClient = new HttpClient { BaseAddress = baseAddress })
+            if (platforms.Count > 0)
             {
-                using (var response = await httpClient.PostAsync(apiEndpoint, new StringContent(JsonConvert.SerializeObject(urlShortenerRequest))))
+
+                string responseData;
+                Uri baseAddress = new Uri(System.Environment.GetEnvironmentVariable("UrlShortenerAPIHostname"));
+                //var baseAddress = new Uri("http://localhost:7071/");
+                string apiEndpoint = $"api/ShortenUrl?code={System.Environment.GetEnvironmentVariable("UrlShortenerApiKey")}";
+
+                using (var httpClient = new HttpClient { BaseAddress = baseAddress })
                 {
-                    responseData = await response.Content.ReadAsStringAsync();
+                    using (var response = await httpClient.PostAsync(apiEndpoint, new StringContent(JsonConvert.SerializeObject(urlShortenerRequest))))
+                    {
+                        responseData = await response.Content.ReadAsStringAsync();
+                    }
                 }
+
+                listOfURLs = JsonConvert.DeserializeObject<List<URLMapping>>(responseData);
             }
 
-            List<URLMapping> listOfURLs = JsonConvert.DeserializeObject<List<URLMapping>>(responseData);
             return listOfURLs;
         }
 
